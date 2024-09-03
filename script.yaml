@@ -1,0 +1,56 @@
+trigger:
+  branches:
+    include:
+      - none
+ 
+stages:
+- stage: SeleniumTestRun
+  displayName: SeleniumTestRun
+  jobs:
+  - job: SeleniumTestRun
+    displayName: SeleniumTestRun
+    pool:
+      vmImage: 'ubuntu-latest'
+ 
+    steps:
+    - script: |
+        sudo apt-get update
+        sudo apt-get install -y wget unzip
+        sudo apt-get install -y google-chrome-stable
+        sudo apt-get install -y libxpm4 libxrender1 libgtk2.0-0 libnss3 libgconf-2-4
+      displayName: 'Install dependencies'
+ 
+    - script: |
+        CHROME_VERSION=$(google-chrome --version | grep -oP '\d+\.\d+\.\d+\.\d+')
+        DRIVER_VERSION=$(curl -s "https://chromedriver.storage.googleapis.com/LATEST_RELEASE_$CHROME_VERSION")
+        wget "https://chromedriver.storage.googleapis.com/$DRIVER_VERSION/chromedriver_linux64.zip"
+        unzip chromedriver_linux64.zip
+        sudo mv chromedriver /usr/bin/chromedriver
+        sudo chown root:root /usr/bin/chromedriver
+        sudo chmod +x /usr/bin/chromedriver
+      displayName: 'Install ChromeDriver'
+ 
+
+  - job: publishseleniumtest
+    dependsOn: SeleniumTestRun
+    displayName: 'publish selenium test result'  
+    steps: 
+    - task: Maven@4
+      inputs:
+        mavenPomFile: 'pom.xml'
+        goals: 'clean test'
+        options: '-Dtest=Role'
+        publishJUnitResults: true
+        testResultsFiles: '**/surefire-reports/TEST-*.xml'
+        javaHomeOption: 'JDKVersion'
+        mavenVersionOption: 'Default'
+        mavenAuthenticateFeed: false
+        effectivePomSkip: false
+        sonarQubeRunAnalysis: false
+
+   
+
+    - task: PublishPipelineArtifact@1
+      displayName: 'Publish Pipeline Artifact'
+      inputs:
+        artifact: AzureSelenium
